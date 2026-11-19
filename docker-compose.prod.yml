@@ -1,0 +1,156 @@
+services:
+  task-service:
+    build:
+      context: ./task-service
+      dockerfile: Dockerfile
+#    platform: linux/amd64
+#    image: nicolahater/task-service:master
+    container_name: task-service
+    env_file: ./task-service/.env
+    networks:
+      - tracker-network
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+
+  front:
+    build:
+      context: ./tracker-front
+      dockerfile: Dockerfile
+#    platform: linux/amd64
+#    image: nicolahater/front:master
+    container_name: front
+    env_file: ./tracker-front/.env
+    ports:
+      - "3001:3001"
+    networks:
+      - tracker-network
+
+  gateway:
+    build:
+      context: ./tracker-gateway
+      dockerfile: Dockerfile
+#    platform: linux/amd64
+#    image: nicolahater/gateway:master
+    container_name: gateway
+    env_file: ./tracker-gateway/.env
+    ports:
+      - "8080:8080"
+    networks:
+      - tracker-network
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+
+  auth-service:
+    build:
+      context: ./tracker-auth-service
+      dockerfile: Dockerfile
+#    platform: linux/amd64
+#    image: nicolahater/auth-service:master
+    container_name: auth-service
+    env_file: ./tracker-auth-service/.env
+    networks:
+      - tracker-network
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+
+  notification-service:
+    build:
+      context: ./tracker-notification-service
+      dockerfile: Dockerfile
+#    platform: linux/amd64
+#    image: nicolahater/notification-service:master
+    container_name: notification-service
+    env_file: ./tracker-notification-service/.env
+    networks:
+      - tracker-network
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+
+  # Infrastructure
+  postgres:
+    image: postgres:17
+    container_name: postgres
+    env_file: .env
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    command: >
+      postgres
+      -c wal_level=logical
+      -c max_wal_senders=10
+      -c max_replication_slots=10
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - tracker-network
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+    ports:
+      - "5432:5432"
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.3.0
+    container_name: zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - tracker-network
+
+  kafka:
+    image: confluentinc/cp-kafka:7.3.0
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://kafka:29092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_MIN_INSYNC_REPLICAS: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+    networks:
+      - tracker-network
+  debezium:
+    image: debezium/connect:2.4.0.Final
+    container_name: debezium
+    ports:
+      - "8083:8083"
+    environment:
+      BOOTSTRAP_SERVERS: kafka:9092
+      GROUP_ID: 1
+      CONFIG_STORAGE_TOPIC: connect_configs
+      OFFSET_STORAGE_TOPIC: connect_offsets
+      STATUS_STORAGE_TOPIC: connect_statuses
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - tracker-network
+    volumes:
+      - debezium-data:/debezium/data
+      - ./conf/:/on-startup/
+    command:
+      - /bin/bash
+      - -c
+      - |
+        /docker-entrypoint.sh start &
+        sleep 30
+        /on-startup/run.sh
+        wait
+
+volumes:
+  postgres-data:
+  debezium-data:
+    driver: local
+networks:
+  tracker-network:
+    driver: bridge
