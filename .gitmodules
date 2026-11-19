@@ -1,15 +1,15 @@
 [submodule "tracker-gateway"]
 	path = tracker-gateway
-	url = https://github.com/nicolahater/tracker-gateway
+	url = https://github.com/nicolahater/tracker-gateway.git
 [submodule "tracker-auth-service"]
 	path = tracker-auth-service
-	url = https://github.com/nicolahater/tracker-auth-service
+	url = https://github.com/nicolahater/tracker-auth-service.git
 [submodule "task-service"]
 	path = task-service
-	url = https://github.com/nicolahater/task-service
+	url = https://github.com/nicolahater/task-service.git
 ; [submodule "tracker-front"] TODO:
 ; 	path = tracker-front
 ; 	url = https://github.com/nicolahater/tracker-front
 [submodule "tracker-notification-service"]
 	path = tracker-notification-service
-	url = https://github.com/nicolahater/tracker-notification-service
+	url = https://github.com/nicolahater/tracker-notification-service.git
